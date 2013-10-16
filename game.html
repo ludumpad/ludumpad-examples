@@ -1,0 +1,102 @@
+<html>
+<head>
+	<style>
+		@font-face{
+			font-family:"StiffStaff";
+			src:url(../ludumpad-client/StiffStaff.otf);
+		}
+		body {
+			margin: 0px;
+			padding: 0px;
+			background-color: white;
+		}
+		#qr {
+			position: fixed;
+			top: 30px;
+			right: 30px;
+			z-index: 1;
+			border: 5px solid white;
+		}
+	</style>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<script src="../ludumpad-client/jquery.min.js"></script>
+	<script src="../ludumpad-client/qrcode.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/1.10.3/plugins/CSSPlugin.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/1.10.3/easing/EasePack.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/1.10.3/TweenLite.min.js"></script>
+	<script src="../ludumpad-client/socket.io.js"></script>
+	<script src="../ludumpad-client/ludumpad.js"></script>
+</head>
+<body>
+	<div id="qr"></div>
+	<canvas id="myCanvas"></canvas>
+	<script>
+
+		var canvas = document.getElementById('myCanvas');
+		var ctx = canvas.getContext('2d');
+
+		$(window).resize(function() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		}.bind(this));
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+
+
+
+		/* LudumPad */
+
+		LudumPad.debugMode();
+		LudumPad.UI.configure({canvas:canvas, ctx:ctx});
+
+		var channel = new LudumPad.Channel ();
+		channel.open();
+
+		channel.on('GamepadConnection', function (gamepad) {
+			gamepad.color = '#'+Math.floor(Math.random()*16777215).toString(16);
+			channel.emitConfigurationToGamepads([gamepad], {
+				bgcolor: gamepad.color,
+				index: gamepad.index,
+				conf: [LudumPad.GamepadInputTypeDPAD, LudumPad.GamepadInputTypeTouches]});
+		});
+
+		channel.on('PacketFromGamepad', function (packet, gamepad) {
+			console.log(packet);
+		});
+
+		/* LudumPad */
+
+
+
+		var qrcode = new QRCode("qr", {
+			text: "http://bluecodestudio.com/ludumpad/gamepad.html?channel="+channel.channelID,
+			width: 150,
+			height: 150,
+			colorDark : "#000000",
+			colorLight : "#ffffff",
+			correctLevel : QRCode.CorrectLevel.H
+		});
+
+		function renderTouch (touch, screen) {
+			ctx.beginPath();
+		    ctx.arc(touch.screenX*canvas.width/screen.width, touch.screenY*canvas.height/screen.height, 50, 0, 2 * Math.PI, false);
+		    ctx.fill();
+		}
+		function renderTouches (gamepad) {
+			ctx.fillStyle = gamepad.color;
+			for (var i = 0; i < gamepad.touches.length; ++i) renderTouch(gamepad.touches[i], gamepad.screen);
+		}
+		function main () {
+			requestAnimationFrame(main);
+			ctx.clearRect(0,0,canvas.width,canvas.height);
+			ctx.lineWidth = 5;
+			for (var i = 0; i < channel.gamepadList.length; ++i) { // Acessing channel's gamepad list
+				var gamepad = channel.gamepadList[i];
+				if (gamepad != undefined) renderTouches(gamepad);
+			}
+			LudumPad.UI.render(); // UI render
+		}
+		requestAnimationFrame(main);
+
+	</script>
+</body>

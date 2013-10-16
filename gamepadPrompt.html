@@ -1,0 +1,166 @@
+<html>
+<head>
+	<style>
+
+		@font-face{
+			font-family:"StiffStaff";
+			src:url(../ludumpad-client/StiffStaff.otf);
+		}
+
+		body {
+			margin: 0px;
+			padding: 0px;
+			background-color: #002240;
+		}
+		
+	</style>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<script src="../ludumpad-client/jquery.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/1.10.3/plugins/CSSPlugin.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/1.10.3/easing/EasePack.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/1.10.3/TweenLite.min.js"></script>
+	<script src="../ludumpad-client/socket.io.js"></script>
+	<script src="../ludumpad-client/ludumpad.js"></script>
+</head>
+<body>
+	<canvas id="myCanvas"></canvas>
+	<script>
+
+		var canvas = document.getElementById('myCanvas');
+		var ctx = canvas.getContext('2d');
+
+		$(window).resize(function() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		}.bind(this));
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+
+
+		var channelID = getParameterByName('channel') || prompt("Channel:");
+
+
+
+		/* LudumPad */
+
+		LudumPad.debugMode();
+		LudumPad.UI.configure({canvas:canvas, ctx:ctx});
+
+		var gamepad = new LudumPad.GamepadClient ({host:prompt("Host:"), channelID:channelID, port:prompt("Port:")});
+		gamepad.connect();
+
+		/* LudumPad */
+
+
+		function renderPause () {
+			if (gamepad.paused) {
+				ctx.save();
+				ctx.globalAlpha = 0.8;
+				ctx.fillStyle = "black";
+				ctx.fillRect(0,0,canvas.width,canvas.height);
+				ctx.restore();
+			}
+		}
+		function renderdpad () {
+			ctx.save();
+			ctx.globalAlpha = 0.2;
+			ctx.fillStyle = "#111111";
+			switch (gamepad.dpad) {
+
+				case 0: ctx.beginPath();
+					ctx.moveTo(0, 0);
+					ctx.lineTo(canvas.width, 0);
+					ctx.lineTo(canvas.width/2, canvas.height/2);
+					ctx.lineTo(0, 0);
+					ctx.fill();
+					break;
+
+				case 1: ctx.beginPath();
+					ctx.moveTo(canvas.width, 0);
+					ctx.lineTo(canvas.width, canvas.height);
+					ctx.lineTo(canvas.width/2, canvas.height/2);
+					ctx.lineTo(canvas.width, 0);
+					ctx.fill();
+					break;
+
+				case 2: ctx.beginPath();
+					ctx.moveTo(canvas.width, canvas.height);
+					ctx.lineTo(0, canvas.height);
+					ctx.lineTo(canvas.width/2, canvas.height/2);
+					ctx.lineTo(canvas.width, canvas.height);
+					ctx.fill();
+					break;
+
+				case 3: ctx.beginPath();
+					ctx.moveTo(0, canvas.height);
+					ctx.lineTo(0,0);
+					ctx.lineTo(canvas.width/2, canvas.height/2);
+					ctx.lineTo(0, canvas.height);
+					ctx.fill();
+					break;
+
+			}
+			ctx.restore();
+		}
+		function renderPing () {
+			ctx.save();
+			ctx.font = "16px sans-serif";
+			var msg = "Ping: "+gamepad.ping;
+			ctx.fillStyle = 'white';
+			ctx.globalAlpha = 0.8;
+			ctx.fillText(msg, 30, canvas.height-30);
+			ctx.restore();
+		}
+		function renderLudumPad () {
+			ctx.save();
+			ctx.font = "30px StiffStaff";
+			ctx.textBaseline = "middle";
+			var msg = "ludumpad";
+			if (gamepad.paused) msg = "PAUSED";
+			var m = ctx.measureText(msg);
+			ctx.fillStyle = 'white';
+			ctx.globalAlpha = 0.8;
+			ctx.fillText(msg, (canvas.width-m.width)/2, (canvas.height)/2);
+			ctx.restore();
+		}
+		function renderGamepadIndex () {
+			ctx.save();
+			ctx.fillStyle = 'white';
+			var initx = (canvas.width-90)/2;
+			for (var i = 0; i < 4; ++i) {
+				ctx.globalAlpha = 0.4;
+				if (i == gamepad.index) ctx.globalAlpha = 0.9;
+				ctx.beginPath();
+		    	ctx.arc(initx + i*30, 30, 10, 0, 2 * Math.PI, false);
+		    	ctx.fill();
+			}
+			ctx.restore();
+		}
+		function renderTouch (touch) {
+			ctx.beginPath();
+		    ctx.arc(touch.screenX, touch.screenY, 50, 0, 2 * Math.PI, false);
+		    ctx.fill();
+		}
+		function renderTouches () {
+			ctx.save();
+			ctx.fillStyle = "white";
+			ctx.globalAlpha = 0.8;
+			for (var i = 0; i < gamepad.touches.length; ++i) renderTouch(gamepad.touches[i]); // Accessing touches
+			ctx.restore();
+		}
+		function main () {
+			requestAnimationFrame(main);
+			ctx.fillStyle = gamepad.bgcolor;
+			ctx.fillRect(0,0,canvas.width,canvas.height);
+			if (gamepad.conf[LudumPad.GamepadInputTypeDPAD]) renderdpad();
+			renderPing();
+			renderLudumPad();
+			if (gamepad.conf[LudumPad.GamepadInputTypeTouches]) renderTouches();
+			renderGamepadIndex();
+			LudumPad.UI.render(); // UI render
+			renderPause();
+		}
+		requestAnimationFrame(main);
+
+	</script>
+</body>
