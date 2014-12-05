@@ -52,12 +52,21 @@
 		var channel = new LudumPad.Channel ();
 		channel.open();
 
+		var dpadPiece = new LudumPad.GamepadType (LudumPad.GamepadTypeDPAD);
+		var dpadPiece2 = new LudumPad.GamepadType (LudumPad.GamepadTypeDPAD);
+
+		var jumpButton = new LudumPad.GamepadButton ("jump");
+		var buttonPiece = new LudumPad.GamepadType (LudumPad.GamepadTypeButtons);
+		buttonPiece.addButtonToRow(jumpButton, 0);
+
+		var gamepadType = [dpadPiece, dpadPiece2];
+
 		channel.on('GamepadConnection', function (gamepad) {
 			gamepad.color = '#'+Math.floor(Math.random()*16777215).toString(16);
 			channel.emitConfigurationToGamepads([gamepad], {
 				bgcolor: gamepad.color,
-				index: gamepad.index,
-				conf: [LudumPad.GamepadInputTypeDPAD, LudumPad.GamepadInputTypeTouches]});
+				index: gamepad.index});
+			gamepad.setTypes(gamepadType);
 		});
 
 		channel.on('PacketFromGamepad', function (packet, gamepad) {

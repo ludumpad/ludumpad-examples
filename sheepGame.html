@@ -8,7 +8,7 @@
 		body {
 			margin: 0px;
 			padding: 0px;
-			background-color: #cccccc;
+			background-color: #33CC33;
 		}
 		#qr {
 			position: fixed;
@@ -57,11 +57,11 @@
 			channel.emitConfigurationToGamepads([gamepad], {
 				bgcolor: gamepad.color,
 				index: gamepad.index,
-				conf: [LudumPad.GamepadInputTypeDPAD, LudumPad.GamepadInputTypeTouches]});
+				conf: [LudumPad.GamepadConfInputTouches]});
 		});
 
 		channel.on('PacketFromGamepad', function (packet, gamepad) {
-			console.log(packet);
+			//Nothing
 		});
 
 		/* LudumPad */
@@ -88,14 +88,64 @@
 			ctx.fillStyle = gamepad.color;
 			for (var i = 0; i < gamepad.touches.length; ++i) renderTouch(gamepad.touches[i], gamepad.screen);
 		}
+
+		function Sheep () {
+			this.x = Math.random()*canvas.width;
+			this.y = Math.random()*canvas.height;
+		}
+		Sheep.prototype = {
+			r : 5,
+			color : 'white',
+			repulsionFromTouch : function (gamepad) {
+				if (gamepad != undefined) {
+					for (var i = 0; i < gamepad.touches.length; ++i) {
+						var touch = gamepad.touches[i];
+						if (touch != undefined) {
+							var t = {x:touch.screenX*canvas.width/gamepad.screen.width, y:touch.screenY*canvas.height/gamepad.screen.height};
+							var dist = Math.sqrt(Math.pow(this.x-t.x, 2)+Math.pow(this.y-t.y, 2));
+							if (dist < 150) {
+
+								var v = {x:t.x-this.x, y:t.y-this.y};
+
+								var force = 10000/Math.pow(dist, 2);
+
+								v.x *= force/dist;
+								v.y *= force/dist;
+
+								this.x -= v.x;
+								this.y -= v.y;
+							}
+						}
+					}
+				}
+			},
+			render : function () {
+				ctx.save();
+				ctx.fillStyle = this.color;
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI, false);
+				ctx.fill();
+				ctx.restore();
+			}
+		}
+
+		var sheeps = [];
+		for (var i = 0; i < 50; ++i) sheeps.push(new Sheep ());
+
+
+
 		function main () {
 			requestAnimationFrame(main);
 			ctx.clearRect(0,0,canvas.width,canvas.height);
-			ctx.lineWidth = 5;
+			var gamepad = channel.gamepadList[0];
 			for (var i = 0; i < channel.gamepadList.length; ++i) { // Acessing channel's gamepad list
 				var gamepad = channel.gamepadList[i];
-				if (gamepad != undefined) renderTouches(gamepad);
+				if (gamepad != undefined) {
+					renderTouches(gamepad);
+					for (var s = 0; s < sheeps.length; ++s) sheeps[s].repulsionFromTouch(gamepad);
+				}
 			}
+			for (var s = 0; s < sheeps.length; ++s) sheeps[s].render();
 			LudumPad.UI.render(); // UI render
 		}
 		requestAnimationFrame(main);

@@ -10,7 +10,7 @@
 		body {
 			margin: 0px;
 			padding: 0px;
-			background-color: #002240;
+			background-color: #fe0e63;
 		}
 		
 	</style>
@@ -28,82 +28,145 @@
 
 		var canvas = document.getElementById('myCanvas');
 		var ctx = canvas.getContext('2d');
+		var pxratio = window.devicePixelRatio;
+		pxratio = 1;
 
-		$(window).resize(function() {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
-		}.bind(this));
-		canvas.width = window.innerWidth;
-		canvas.height = window.innerHeight;
+		function resizeHandler () {
+			setTimeout(function () {
+				canvas.style.width  = window.innerWidth+'px';
+				canvas.style.height = window.innerHeight+'px';
+				canvas.width = window.innerWidth*pxratio;
+				canvas.height = window.innerHeight*pxratio;
+				ctx.scale(pxratio, pxratio);
+			}, 1);
+		}
+		$(window).resize(resizeHandler);
+		resizeHandler();
 
 
 		var host = getParameterByName('host') || prompt("Host:");
 		var channelID = getParameterByName('channel') || prompt("Channel:");
 		var port = getParameterByName('port') || prompt('Port:');
 
+		var gamepadPieces = [];
 
+		function Vector2 (x, y) {
+			this.x = x;
+			this.y = y;
+		}
+		Vector2.prototype.scalar = function (l) {
+			this.x *= l;
+			this.y *= l;
+			return this;
+		}
+		Vector2.prototype.copy = function () {
+			return new Vector2 (this.x, this.y);
+		}
+		Vector2.prototype.add = function (v) {
+			this.x += v.x;
+			this.y += v.y;
+			return this;
+		}
+		Vector2.prototype.distTo = function (v) {
+			return Math.sqrt( Math.pow(v.x-this.x, 2) + Math.pow(v.y-this.y, 2) );
+		}
+		Vector2.prototype.unit = function () {
+			var mod = this.distTo({x:0, y:0});
+			this.x /= mod;
+			this.y /= mod;
+			return this;
+		}
 
+		function Piece () {
 
-		/* LudumPad */
+		}
+		Piece.prototype = {
+			margin : 10,
+			border : 2
+		}
 
-		LudumPad.debugMode();
-		LudumPad.UI.configure({canvas:canvas, ctx:ctx});
+		function DPADPiece () {
 
-		var gamepad = new LudumPad.GamepadClient ({host:host, channelID:channelID, port:port});
-		gamepad.connect();
+		}
+		DPADPiece.prototype = new Piece ();
+		DPADPiece.prototype.dpad = -1;
+		DPADPiece.prototype.firstPoint = [
+			new Vector2 (0.5, -0.5),
+			new Vector2 (0.5, 0.5),
+			new Vector2 (-0.5, 0.5),
+			new Vector2 (-0.5, -0.5)
+		];
+		DPADPiece.prototype.dirPoints = [
+			new Vector2 (0, -1),
+			new Vector2 (1, 0),
+			new Vector2 (0, 1),
+			new Vector2 (-1, 0)
+		];
+		DPADPiece.prototype.logic = function (origin, size) {
 
-		/* LudumPad */
+			var rh = size.y - 2*this.margin;
+			var rw = size.x - 2*this.margin;
+			this.r = rh > rw ? rw/2 : rh/2;
+			this.c = new Vector2 (origin.x + size.x/2, origin.y + size.y/2);
 
+			var insideTouch = this.firstInsideTouch();
+			if (insideTouch != undefined) this.dirForTouch(insideTouch);
+			else this.dpad = -1;
+
+			this.gtype.dpad = this.dpad;
+
+		}
+		DPADPiece.prototype.firstInsideTouch = function () {
+			for (var i = 0; i < gamepad.touches.length; ++i) {
+				var touch = gamepad.touches[i];
+				var dist = this.c.distTo({x:touch.screenX, y:touch.screenY});
+				if (dist <= this.r+this.margin) return touch;
+			}
+		}
+		DPADPiece.prototype.dirForTouch = function (t) {
+			var vtouch = (new Vector2 (t.screenX, t.screenY)).add(this.c.copy().scalar(-1));
+			var closestDir = -1;
+			var closestDist = this.r*2;
+			for (var i = 0; i < 4; ++i) {
+				var dist = this.dirPoints[i].distTo(vtouch);
+				if (dist < closestDist) {
+					closestDir = i;
+					closestDist = dist;
+				}
+			}
+			this.dpad = closestDir;
+		}
+		DPADPiece.prototype.render = function () {
+
+			ctx.beginPath();
+			ctx.arc(this.c.x, this.c.y, this.r, 0, Math.PI*2, true);
+			ctx.lineWidth = this.border;
+			ctx.strokeStyle = "white";
+			ctx.stroke();
+
+			if (this.dpad == -1) return;
+
+			ctx.beginPath();
+			ctx.moveTo(this.c.x, this.c.y);
+			var v = this.firstPoint[this.dpad].copy().unit().scalar(this.r);
+			ctx.lineTo(this.c.x + v.x, this.c.y + v.y);
+			var initRad = 7*2*Math.PI/8
+			var radInc = -2*2*Math.PI/8
+			ctx.arc(this.c.x, this.c.y, this.r, initRad - radInc*this.dpad, initRad+(1-this.dpad)*radInc, true);
+			ctx.lineTo(this.c.x, this.c.y);
+			ctx.fillStyle = "white";
+			ctx.fill();
+
+		}
 
 		function renderPause () {
 			if (gamepad.paused) {
 				ctx.save();
 				ctx.globalAlpha = 0.8;
 				ctx.fillStyle = "black";
-				ctx.fillRect(0,0,canvas.width,canvas.height);
+				ctx.fillRect(0,0,window.innerWidth,window.innerHeight);
 				ctx.restore();
 			}
-		}
-		function renderdpad () {
-			ctx.save();
-			ctx.globalAlpha = 0.2;
-			ctx.fillStyle = "#111111";
-			switch (gamepad.dpad) {
-
-				case 0: ctx.beginPath();
-					ctx.moveTo(0, 0);
-					ctx.lineTo(canvas.width, 0);
-					ctx.lineTo(canvas.width/2, canvas.height/2);
-					ctx.lineTo(0, 0);
-					ctx.fill();
-					break;
-
-				case 1: ctx.beginPath();
-					ctx.moveTo(canvas.width, 0);
-					ctx.lineTo(canvas.width, canvas.height);
-					ctx.lineTo(canvas.width/2, canvas.height/2);
-					ctx.lineTo(canvas.width, 0);
-					ctx.fill();
-					break;
-
-				case 2: ctx.beginPath();
-					ctx.moveTo(canvas.width, canvas.height);
-					ctx.lineTo(0, canvas.height);
-					ctx.lineTo(canvas.width/2, canvas.height/2);
-					ctx.lineTo(canvas.width, canvas.height);
-					ctx.fill();
-					break;
-
-				case 3: ctx.beginPath();
-					ctx.moveTo(0, canvas.height);
-					ctx.lineTo(0,0);
-					ctx.lineTo(canvas.width/2, canvas.height/2);
-					ctx.lineTo(0, canvas.height);
-					ctx.fill();
-					break;
-
-			}
-			ctx.restore();
 		}
 		function renderPing () {
 			ctx.save();
@@ -123,15 +186,15 @@
 			var m = ctx.measureText(msg);
 			ctx.fillStyle = 'white';
 			ctx.globalAlpha = 0.8;
-			ctx.fillText(msg, (canvas.width-m.width)/2, (canvas.height)/2);
+			ctx.fillText(msg, (window.innerWidth-m.width)/2, (window.innerHeight)/2);
 			ctx.restore();
 		}
 		function renderGamepadIndex () {
 			ctx.save();
 			ctx.fillStyle = 'white';
-			var initx = (canvas.width-90)/2;
+			var initx = (window.innerWidth-90)/2;
 			for (var i = 0; i < 4; ++i) {
-				ctx.globalAlpha = 0.4;
+				ctx.globalAlpha = 0.25;
 				if (i == gamepad.index) ctx.globalAlpha = 0.9;
 				ctx.beginPath();
 		    	ctx.arc(initx + i*30, 30, 10, 0, 2 * Math.PI, false);
@@ -154,16 +217,73 @@
 		function main () {
 			requestAnimationFrame(main);
 			ctx.fillStyle = gamepad.bgcolor;
-			ctx.fillRect(0,0,canvas.width,canvas.height);
-			if (gamepad.conf[LudumPad.GamepadInputTypeDPAD]) renderdpad();
+			ctx.fillRect(0,0,window.innerWidth,window.innerHeight);
+			var origin = new Vector2 (0, 0);
+			var originInc;
+			var size;
+			if (window.innerWidth > window.innerHeight) {
+				size = new Vector2 (window.innerWidth/gamepadPieces.length, window.innerHeight);
+				originInc = new Vector2 (size.x, 0);
+			}
+			else {
+				size = new Vector2 (window.innerWidth, window.innerHeight/gamepadPieces.length);
+				originInc = new Vector2 (0, size.y);
+			}
+			for (var i = 0; i < gamepadPieces.length; ++i) {
+				var piece = gamepadPieces[i];
+				piece.logic(origin, size);
+				piece.render();
+				origin.add(originInc);
+			}
 			renderPing();
 			renderLudumPad();
-			if (gamepad.conf[LudumPad.GamepadInputTypeTouches]) renderTouches();
+			if (gamepad.conf[LudumPad.GamepadConfInputTouches]) renderTouches();
 			renderGamepadIndex();
 			LudumPad.UI.render(); // UI render
 			renderPause();
 		}
+
+
+		/* LudumPad */
+
+		LudumPad.debugMode();
+		LudumPad.UI.configure({canvas:canvas, ctx:ctx});
+
+		var gamepad = new LudumPad.GamepadClient ({host:host, channelID:channelID, port:port});
+		gamepad.connect();
+		gamepad.on('TypeSync', function () {
+			gamepadPieces = [];
+			for (var i = 0; i < gamepad.types.length; ++i) {
+
+				var gtype = gamepad.types[i];
+				var piece;
+
+				switch (gtype.type) {
+
+					case LudumPad.GamepadTypeDPAD: piece = new DPADPiece ();
+					break;
+
+					case LudumPad.GamepadTypeButtons: piece = new DPADPiece ();
+					break;
+
+					default: piece = new DPADPiece ();
+					break;
+
+				}
+
+				piece.gtype = gtype;
+				gamepadPieces.push(piece);
+
+			}
+		});
+
+		/* LudumPad */
+
+
 		requestAnimationFrame(main);
+
+		gamepad.dpad = 0;
+		gamepad.bgcolor = "#fe0e63";
 
 	</script>
 </body>

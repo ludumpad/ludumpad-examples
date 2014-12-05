@@ -8,7 +8,7 @@
 		body {
 			margin: 0px;
 			padding: 0px;
-			background-color: #cccccc;
+			background-color: #33CC33;
 		}
 		#qr {
 			position: fixed;
@@ -57,11 +57,11 @@
 			channel.emitConfigurationToGamepads([gamepad], {
 				bgcolor: gamepad.color,
 				index: gamepad.index,
-				conf: [LudumPad.GamepadInputTypeDPAD, LudumPad.GamepadInputTypeTouches]});
+				conf: [LudumPad.GamepadConfInputTouches, LudumPad.GamepadConfInputGyroscope]});
 		});
 
 		channel.on('PacketFromGamepad', function (packet, gamepad) {
-			console.log(packet);
+			//Nothing
 		});
 
 		/* LudumPad */
@@ -77,7 +77,6 @@
 				correctLevel : QRCode.CorrectLevel.H
 			});
 		});
-		
 
 		function renderTouch (touch, screen) {
 			ctx.beginPath();
@@ -88,15 +87,90 @@
 			ctx.fillStyle = gamepad.color;
 			for (var i = 0; i < gamepad.touches.length; ++i) renderTouch(gamepad.touches[i], gamepad.screen);
 		}
+
+		function degDistance (d1, d2) {
+			var ndist = d1-d2;
+			var ldist = d1-d2+360;
+			var rdist = d1-d2-360;
+			var min = Math.min(Math.abs(ndist), Math.abs(ldist), Math.abs(rdist));
+			if (Math.abs(ndist) == min) return ndist;
+			if (Math.abs(ldist) == min) return ldist;
+			if (Math.abs(rdist) == min) return rdist;
+			throw new Error ("Something weird happened");
+		}
+
+		var touchdown = false;
+		var currentpoint = 0;
+		var pointdir = [0,0,0,0];
+		var incrementx = 0;
+		var incrementy = 0;
+
+		var currballx = 0;
+		var currbally = 0;
+
+		var targetx = 0;
+		var targety = 0;
+
+		function resetTarget () {
+			targetx = Math.random()*canvas.width;
+			targety = Math.random()*canvas.height;
+		}
+
+		function checkTarget () {
+			if (Math.sqrt(Math.pow(targetx-currballx,2) + Math.pow(targety-currbally,2)) < 100) resetTarget();
+		}
+
+		resetTarget();
+
+		function doPoint (gamepad) {
+			if (currentpoint >= 4) return;
+			if (currentpoint <= 2) pointdir[currentpoint] = gamepad.gyroscope.dir;
+			else pointdir[currentpoint] = gamepad.gyroscope.FB;
+			++currentpoint;
+			if (currentpoint >= 4) {
+				incrementx = degDistance(pointdir[0], pointdir[1]);
+				incrementy = pointdir[2]-pointdir[3];
+			}
+		}
+
 		function main () {
 			requestAnimationFrame(main);
 			ctx.clearRect(0,0,canvas.width,canvas.height);
-			ctx.lineWidth = 5;
+
+			ctx.beginPath();
+			ctx.fillStyle = "white";
+		    ctx.arc(targetx, targety, 50, 0, 2 * Math.PI, false);
+		    ctx.fill();
+
 			for (var i = 0; i < channel.gamepadList.length; ++i) { // Acessing channel's gamepad list
 				var gamepad = channel.gamepadList[i];
-				if (gamepad != undefined) renderTouches(gamepad);
+				if (gamepad.touches.length > 0) console.log(gamepad.gyroscope);
+				renderTouches(gamepad);
+				if (gamepad.touches.length > 0 && !touchdown) {
+					touchdown = true;
+					doPoint(gamepad);
+				} else if (gamepad.touches.length == 0 && touchdown) touchdown = false;
+				if (incrementx != 0) {
+
+					var ballx = canvas.width*degDistance(pointdir[0], gamepad.gyroscope.dir)/incrementx;
+					var bally = canvas.height*(pointdir[2]-gamepad.gyroscope.FB)/incrementy;
+					currballx += (ballx-currballx)/2;
+					currbally += (bally-currbally)/2;
+
+					ctx.beginPath();
+					ctx.fillStyle = gamepad.color;
+				    ctx.arc(currballx, currbally, 50, 0, 2 * Math.PI, false);
+				    ctx.fill();
+
+					ctx.beginPath();
+					ctx.fillStyle = "white";
+				    ctx.arc(ballx, bally, 10, 0, 2 * Math.PI, false);
+				    ctx.fill();
+					
+				}
 			}
 			LudumPad.UI.render(); // UI render
+			checkTarget();
 		}
 		requestAnimationFrame(main);
 
